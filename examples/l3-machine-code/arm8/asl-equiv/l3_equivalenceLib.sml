@@ -326,7 +326,7 @@ val asl_reg_ss =
     sail2_state_monadTheory.write_regS_def,
     sail2_state_monadTheory.readS_def,
     sail2_state_monadTheory.updateS_def,
-    R_ref_def, PSTATE_ref_def,
+    R_ref_def, PSTATE_ref_def, SEE_ref_def,
     SCTLR_EL1_ref_def, SCTLR_EL1_ref_def, SCTLR_EL2_ref_def, SCTLR_EL3_ref_def,
     PC_ref_def,
     SP_EL0_ref_def, SP_EL1_ref_def, SP_EL2_ref_def, SP_EL3_ref_def,
