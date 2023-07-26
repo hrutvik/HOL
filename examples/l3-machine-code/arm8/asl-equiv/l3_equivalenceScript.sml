@@ -121,14 +121,13 @@ Definition asl_sys_regs_ok_def:
     asl.regstate.bitvector_64_dec_reg "__CNTControlBase" = 0b0w ∧
 
     (let TCR_EL1 = asl.regstate.bitvector_64_dec_reg "TCR_EL1" in
-      ¬word_bit 51 TCR_EL1 ∧ ¬word_bit 52 TCR_EL1 ∧
-      ¬word_bit 37 TCR_EL1 ∧ ¬word_bit 38 TCR_EL1) ∧
+      ¬word_bit 51 TCR_EL1 ∧ ¬word_bit 52 TCR_EL1) ∧
 
     (let TCR_EL2 = asl.regstate.bitvector_64_dec_reg "TCR_EL2" in
-      ¬word_bit 29 TCR_EL2 ∧ ¬word_bit 20 TCR_EL2) ∧
+      ¬word_bit 29 TCR_EL2) ∧
 
     (let TCR_EL3 = asl.regstate.bitvector_32_dec_reg "TCR_EL3" in
-      ¬word_bit 29 TCR_EL3 ∧ ¬word_bit 20 TCR_EL3)
+      ¬word_bit 29 TCR_EL3)
 End
 
 Definition l3_models_asl_def:
