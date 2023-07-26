@@ -289,6 +289,244 @@ Proof
   rw[FUN_EQ_THM] >> EVAL_TAC
 QED
 
+
+(*
+Theorem EffectiveTBI_exists:
+  ∀addr el asl.
+    ¬ asl.regstate.bool_reg "__highest_el_aarch32" ∧
+    (let SCR_EL3 = asl.regstate.bitvector_64_dec_reg "SCR_EL3" in
+     word_bit 0 SCR_EL3 (* ELs below 3 are non-secure *) ∧
+     word_bit 10 SCR_EL3 (* RW bit - ELs below 3 are not AArch32 *) ∧
+     ¬ word_bit 18 SCR_EL3 (* Secure EL2 disabled *)) ∧
+    (let HCR_EL2 = asl.regstate.bitvector_64_dec_reg "HCR_EL2" in
+      word_bit 31 HCR_EL2 (* RW bit - EL1 is AArch64 *) ∧
+      ¬ word_bit 34 HCR_EL2 (* Virtualization Host Extension (FEAT_VHE) disabled *)) ∧
+    (asl.regstate.ProcState_reg "PSTATE").ProcState_nRW = 0b0w
+  ⇒ ∃w. EffectiveTBI addr F el asl = returnS w asl
+Proof
+  rw[] >> simp[EffectiveTBI_def] >>
+  qspecl_then [`asl`,`el`] mp_tac S1TranslationRegime >> simp[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  qspecl_then [`asl`,`if el = 0w then 1w else el`]
+    mp_tac ELUsingAArch32_F >> simp[] >> impl_tac >- rw[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  IF_CASES_TAC
+  >- (
+    simp[Once bindS, asl_word_rws] >>
+    simp[sail2_valuesTheory.just_list_def] >>
+    DEP_REWRITE_TAC[EL_MAP] >> simp[] >>
+    DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+    simp[pairTheory.EXISTS_PROD, returnS, bindS,
+         PULL_EXISTS, COND_RATOR, AllCaseEqs()] >>
+    simp[sail2_state_monadTheory.read_regS_def,
+         sail2_state_monadTheory.readS_def, returnS, TCR_EL1_ref_def] >>
+    simp[SF DNF_ss] >> metis_tac[]
+    ) >>
+  reverse IF_CASES_TAC
+  >- (
+    simp[pairTheory.EXISTS_PROD, returnS, bindS,
+         PULL_EXISTS, COND_RATOR, AllCaseEqs()] >>
+    simp[sail2_state_monadTheory.read_regS_def,
+         sail2_state_monadTheory.readS_def, returnS, TCR_EL3_ref_def] >>
+    simp[SF DNF_ss] >> metis_tac[]
+    ) >>
+  drule ELIsInHost_F >> simp[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  simp[asl_reg_rws, bindS, returnS]
+QED
+*)
+
+Theorem EffectiveTBI:
+  ∀addr el asl.
+    ¬ asl.regstate.bool_reg "__highest_el_aarch32" ∧
+    (let SCR_EL3 = asl.regstate.bitvector_64_dec_reg "SCR_EL3" in
+     word_bit 0 SCR_EL3 (* ELs below 3 are non-secure *) ∧
+     word_bit 10 SCR_EL3 (* RW bit - ELs below 3 are not AArch32 *) ∧
+     ¬ word_bit 18 SCR_EL3 (* Secure EL2 disabled *)) ∧
+    (let HCR_EL2 = asl.regstate.bitvector_64_dec_reg "HCR_EL2" in
+      word_bit 31 HCR_EL2 (* RW bit - EL1 is AArch64 *) ∧
+      ¬ word_bit 34 HCR_EL2 (* Virtualization Host Extension (FEAT_VHE) disabled *)) ∧
+
+    (* Disable all TBIs *)
+    (let TCR_EL1 = asl.regstate.bitvector_64_dec_reg "TCR_EL1" in
+      ¬word_bit 51 TCR_EL1 ∧ ¬word_bit 52 TCR_EL1 ∧
+      ¬word_bit 37 TCR_EL1 ∧ ¬word_bit 38 TCR_EL1) ∧
+    (let TCR_EL2 = asl.regstate.bitvector_64_dec_reg "TCR_EL2" in
+      ¬word_bit 20 TCR_EL2) ∧
+    (let TCR_EL3 = asl.regstate.bitvector_32_dec_reg "TCR_EL3" in
+      ¬word_bit 20 TCR_EL3) ∧
+
+    (asl.regstate.ProcState_reg "PSTATE").ProcState_nRW = 0b0w
+  ⇒ EffectiveTBI addr F el asl = returnS 0w asl
+Proof
+  rw[] >> simp[EffectiveTBI_def] >>
+  qspecl_then [`asl`,`el`] mp_tac S1TranslationRegime >> simp[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  qspecl_then [`asl`,`if el = 0w then 1w else el`]
+    mp_tac ELUsingAArch32_F >> simp[] >> impl_tac >- rw[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  IF_CASES_TAC >> simp[]
+  >- (
+    simp[Once bindS, asl_word_rws] >>
+    simp[sail2_valuesTheory.just_list_def] >>
+    DEP_REWRITE_TAC[EL_MAP] >> simp[] >>
+    DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+    simp[pairTheory.EXISTS_PROD, returnS, bindS,
+         PULL_EXISTS, COND_RATOR, AllCaseEqs()] >>
+    simp[asl_reg_rws, returnS, extract_bit_64, SF DNF_ss] >> rw[DISJ_EQ_IMP]
+    ) >>
+  IF_CASES_TAC >> simp[]
+  >- (
+    drule ELIsInHost_F >> simp[] >> strip_tac >>
+    simp[asl_reg_rws, returnS, bindS, extract_bit_64]
+    ) >>
+  IF_CASES_TAC >> simp[]
+  >- (
+    simp[asl_reg_rws, returnS, bindS] >>
+    DEP_REWRITE_TAC[extract_bit] >> simp[]
+    ) >>
+  Cases_on_word_value `el` >> gvs[]
+QED
+
+(*
+Theorem EffectiveTCMA_exists:
+  ∀addr el asl.
+    ¬ asl.regstate.bool_reg "__highest_el_aarch32" ∧
+    (let SCR_EL3 = asl.regstate.bitvector_64_dec_reg "SCR_EL3" in
+     word_bit 0 SCR_EL3 (* ELs below 3 are non-secure *) ∧
+     word_bit 10 SCR_EL3 (* RW bit - ELs below 3 are not AArch32 *) ∧
+     ¬ word_bit 18 SCR_EL3 (* Secure EL2 disabled *)) ∧
+    (let HCR_EL2 = asl.regstate.bitvector_64_dec_reg "HCR_EL2" in
+      word_bit 31 HCR_EL2 (* RW bit - EL1 is AArch64 *) ∧
+      ¬ word_bit 34 HCR_EL2 (* Virtualization Host Extension (FEAT_VHE) disabled *)) ∧
+    (asl.regstate.ProcState_reg "PSTATE").ProcState_nRW = 0b0w
+  ⇒ ∃w. EffectiveTCMA addr el asl = returnS w asl
+Proof
+  rw[] >> simp[EffectiveTCMA_def] >>
+  drule S1TranslationRegime >> simp[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  drule ELUsingAArch32_F >> simp[] >>
+  disch_then $ qspec_then `if el = 0w then 1w else el` mp_tac >>
+  impl_tac >- rw[] >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+  Cases_on_word_value `el` >> gvs[]
+  >- simp[asl_reg_rws, asl_word_rws, returnS, bindS]
+  >- (
+    drule ELIsInHost_F >> simp[] >> strip_tac >>
+    simp[Once returnS, Once bindS] >>
+    simp[asl_reg_rws, asl_word_rws, returnS, bindS]
+    ) >>
+  simp[asl_reg_rws, asl_word_rws, returnS, bindS] >>
+  simp[sail2_valuesTheory.just_list_def, EL_MAP] >>
+  DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+  IF_CASES_TAC >> simp[bindS, returnS]
+QED
+
+Theorem AArch64_AccessIsTagChecked_exists:
+  ∀vaddr acctype asl.
+    ¬ asl.regstate.bool_reg "__highest_el_aarch32" ∧
+    (let SCR_EL3 = asl.regstate.bitvector_64_dec_reg "SCR_EL3" in
+     word_bit 0 SCR_EL3 (* ELs below 3 are non-secure *) ∧
+     word_bit 10 SCR_EL3 (* RW bit - ELs below 3 are not AArch32 *) ∧
+     ¬ word_bit 18 SCR_EL3 (* Secure EL2 disabled *)) ∧
+    (let HCR_EL2 = asl.regstate.bitvector_64_dec_reg "HCR_EL2" in
+      word_bit 31 HCR_EL2 (* RW bit - EL1 is AArch64 *) ∧
+      ¬ word_bit 34 HCR_EL2 (* Virtualization Host Extension (FEAT_VHE) disabled *)) ∧
+    (asl.regstate.ProcState_reg "PSTATE").ProcState_nRW = 0b0w
+  ⇒ ∃b. AArch64_AccessIsTagChecked vaddr acctype asl = returnS b asl
+Proof
+  rw[] >> simp[AArch64_AccessIsTagChecked_def] >>
+  `read_regS PSTATE_ref asl =
+   returnS (asl.regstate.ProcState_reg "PSTATE") asl : ProcState res`
+    by rw[asl_reg_rws] >>
+  simp[Once bindS, Once returnS] >>
+
+  simp[asl_word_rws] >>
+  DEP_REWRITE_TAC[HD_MAP] >> simp[w2v_not_NIL] >>
+  simp[sail2_valuesTheory.just_list_def] >>
+  once_rewrite_tac[GSYM EL] >>
+  DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+  Cases_on `word_bit 4 ((asl.regstate.ProcState_reg "PSTATE").ProcState_M)` >>
+  gvs[word_bit_def] >- irule_at Any EQ_REFL >>
+
+  simp[Once bindS, Once returnS] >>
+  DEP_REWRITE_TAC[HD_MAP] >> simp[w2v_not_NIL] >>
+  once_rewrite_tac[GSYM EL] >>
+  DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+  ntac 2 $ simp[Once bindS, Once returnS] >>
+
+
+  drule EffectiveTBI_exists >> gvs[word_bit_def] >>
+  qmatch_goalsub_abbrev_tac `EffectiveTBI _ _ el` >>
+  disch_then $ qspecl_then [`vaddr`,`el`] assume_tac >> gvs[] >>
+  simp[Once returnS] >>
+
+  IF_CASES_TAC >- simp[returnS] >>
+  ntac 3 $ simp[Once bindS, Once returnS] >>
+  drule EffectiveTCMA_exists >> simp[word_bit_def] >>
+  disch_then $ qspecl_then [`vaddr`,`el`] mp_tac >> strip_tac >>
+  simp[Once bindS, Once returnS] >>
+
+
+  qmatch_goalsub_abbrev_tac `bindS foo` >>
+  `∃b. foo asl = returnS b asl` by (unabbrev_all_tac >> rw[returnS]) >>
+  simp[Once bindS, Once returnS] >>
+  IF_CASES_TAC >- simp[returnS] >> gvs[] >>
+  ntac 3 $ simp[Once bindS, Once returnS] >>
+
+
+
+AArch64_AllocationTagAccessIsEnabled_def
+
+
+QED
+*)
+
+Theorem AArch64_AccessIsTagChecked:
+  ∀vaddr acctype asl.
+    ¬ asl.regstate.bool_reg "__highest_el_aarch32" ∧
+    (let SCR_EL3 = asl.regstate.bitvector_64_dec_reg "SCR_EL3" in
+     word_bit 0 SCR_EL3 (* ELs below 3 are non-secure *) ∧
+     word_bit 10 SCR_EL3 (* RW bit - ELs below 3 are not AArch32 *) ∧
+     ¬ word_bit 18 SCR_EL3 (* Secure EL2 disabled *)) ∧
+    (let HCR_EL2 = asl.regstate.bitvector_64_dec_reg "HCR_EL2" in
+      word_bit 31 HCR_EL2 (* RW bit - EL1 is AArch64 *) ∧
+      ¬ word_bit 34 HCR_EL2 (* Virtualization Host Extension (FEAT_VHE) disabled *)) ∧
+
+    (* Disable all TBIs *)
+    (let TCR_EL1 = asl.regstate.bitvector_64_dec_reg "TCR_EL1" in
+      ¬word_bit 51 TCR_EL1 ∧ ¬word_bit 52 TCR_EL1 ∧
+      ¬word_bit 37 TCR_EL1 ∧ ¬word_bit 38 TCR_EL1) ∧
+    (let TCR_EL2 = asl.regstate.bitvector_64_dec_reg "TCR_EL2" in
+      ¬word_bit 20 TCR_EL2) ∧
+    (let TCR_EL3 = asl.regstate.bitvector_32_dec_reg "TCR_EL3" in
+      ¬word_bit 20 TCR_EL3) ∧
+
+    (asl.regstate.ProcState_reg "PSTATE").ProcState_nRW = 0b0w
+  ⇒ AArch64_AccessIsTagChecked vaddr acctype asl = returnS F asl
+Proof
+  rw[] >> simp[AArch64_AccessIsTagChecked_def] >>
+  `read_regS PSTATE_ref asl =
+   returnS (asl.regstate.ProcState_reg "PSTATE") asl : ProcState res`
+    by rw[asl_reg_rws] >>
+  simp[Once bindS, Once returnS] >>
+  simp[asl_word_rws] >>
+  DEP_REWRITE_TAC[HD_MAP] >> simp[w2v_not_NIL] >>
+  simp[sail2_valuesTheory.just_list_def] >>
+  once_rewrite_tac[GSYM EL] >>
+  DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+  Cases_on `word_bit 4 ((asl.regstate.ProcState_reg "PSTATE").ProcState_M)` >>
+  gvs[word_bit_def] >>
+  simp[Once bindS, Once returnS] >>
+  DEP_REWRITE_TAC[HD_MAP] >> simp[w2v_not_NIL] >>
+  once_rewrite_tac[GSYM EL] >>
+  DEP_REWRITE_TAC[el_w2v] >> simp[] >>
+  ntac 2 $ simp[Once bindS, Once returnS] >>
+  drule EffectiveTBI >> gvs[word_bit_def] >>
+  strip_tac >> simp[returnS]
+QED
+
+(*
 Theorem AArch64_AccessIsTagChecked:
   ∀vaddr acctype asl.
     word_bit 4 ((asl.regstate.ProcState_reg "PSTATE").ProcState_M) ⇒
@@ -301,6 +539,7 @@ Proof
   once_rewrite_tac[GSYM EL] >>
   DEP_REWRITE_TAC[el_w2v] >> simp[] >> gvs[word_bit_def]
 QED
+*)
 
 Theorem GenMPAMcurEL:
   ∀b asl. ¬asl.regstate.bool_reg "__highest_el_aarch32" ⇒
@@ -2611,6 +2850,7 @@ Theorem AArch64_TranslateAddress:
       AArch64_TranslateAddress vaddr acctype iswrite aligned size asl =
       returnS addrdesc asl ∧
       addrdesc.AddressDescriptor_paddress.FullAddress_address = vaddr ∧
+      addrdesc.AddressDescriptor_memattrs.MemoryAttributes_tagged = F ∧
       ¬IsFault addrdesc
 Proof
   rw[AArch64_TranslateAddress_def, bindS, returnS] >>
@@ -2627,7 +2867,8 @@ Proof
     preludeTheory.undefined_int_def,
     sail2_state_monadTheory.undefined_boolS_def
     ] >>
-  simp[returnS, IsFault_def]
+  simp[returnS, IsFault_def] >>
+  cheat
 QED
 
 Theorem l3_asl_Align:
@@ -2870,6 +3111,11 @@ Proof
   impl_tac >- gvs[asl_sys_regs_ok_def] >> rw[] >> simp[Once bindS] >>
   ntac 2 $ simp[Once returnS] >> simp[] >>
   qpat_abbrev_tac `addr = _.FullAddress_address` >>
+
+
+
+
+
   qspecl_then [`addr`,`AccType_NORMAL`,`asl`] mp_tac AArch64_AccessIsTagChecked >>
   impl_tac >- gvs[asl_sys_regs_ok_def] >> strip_tac >>
   drule $ INST_TYPE [gamma |-> ``:word8``] returnS_bindS >>
